@@ -1,0 +1,183 @@
+---
+title: "Data project: How Horror Subgenres Perform in Ratings and Revenue"
+author: "Siwakorn Jiwawuttipong"
+format: html
+embed-resources: true
+---
+```{r}
+#| label: setup
+#| message: false
+#| warning: false
+library(tidyverse)
+library(gt)
+horror_movies <- readr::read_csv("horror_movies.csv")
+```
+## Introduction
+
+  In this project I will be exploring how different horror subgenres perform in terms of audience ratings and financial success. My interest in this topic comes from personal experience, as one of my earliest memories of watching horror was the Thai horror comedy "How Taew Tak 1". Watching it with my siblings made the experience both entertaining and memorable, and it shaped how I think about horror as a genre. Rather than being scary, horror movies can also be humorous, suspenseful and emotionally engaging, which raises the question of whether different subgenres are received differently by audiences.
+  
+  Before begining my project I always wanted to learn why people such as myself enjoy horror movies, even though they are designed to create fear, which is typically a negative emotion which we tend to avoid.Based on my research, people enjoy horror movies because they create a mix of fear and excitement in a safe environment. While watching, the brain activates fear responses similar to real danger, but once the suspense ends, that fear turns into relief and pleasure. This balance of emotions helps explain why many viewers find horror movies thrilling rather than purely unpleasant.^[Shelby Bradford and Priyom Bose, “Why Do We Like Horror Movies?,” *The Scientist*, October 14, 2024, https://www.the-scientist.com/why-do-some-people-enjoy-horror-movies-72181.]
+  
+  In addition, I went and research on subgenres of horror film as well. The subgenres allow filmmakers to create different types of fear using various techniques such as suspense, jump scares, and psychological tension. Common horror subgenres include paranormal, monster, slasher, zombie, psychological, and comedic horror, each focusing on different sources of fear, from supernatural forces to human violence. The diversity of these subgenres helps explain why horror remains popular, as audiences can experience different emotional reactions depending on the style of horror being presented.^[“Subgenres of Horror Films Explained,” *The Los Angeles Film School*, https://www.lafilm.edu/blog/subgenres-of-horror-films/.]
+      
+ This means that horror is nto just one single experience, but a mix of a lot of different emotions and responses. As some subgenres appeal to audiences looking for tension and realism, while others attract viewers who enjoy humor or mystery. These differences help explain why horror remains such a popular genre.
+  
+  From a data perspective, this question can be explored using variables such as average rating, vote count, and financial profit(Financial success was measured using profit, calculated as revenue minus budget.). These measures allow us to compare how different subgenres perform in terms of both audience evaluation and financial success.
+
+As a result, my central question is:
+
+**Do different horror subgenres show differences in ratings and financial success, and what does this reveal about audience responses to different types of horror?**
+  
+
+```{r}
+#| message: false
+#| warning: false
+glimpse(horror_movies)
+```
+
+## Preparing the data
+After examining the data, I selected key variables related to genre, ratings, audience engagement, budget, and revenue, and removed zero values.
+```{r}
+#| message: false
+#| warning: false
+horror_long <- horror_movies %>%
+  select(title,
+         genre_names,
+         vote_average,
+         vote_count,
+         budget,
+         revenue) %>%
+  filter(vote_average > 0,
+       vote_count > 0,
+       budget > 0,
+       revenue > 0) %>%
+  separate_rows(genre_names, sep = ", ")
+
+count(horror_long, genre_names, sort = TRUE)
+```
+Since many movies belong to multiple genres, a single film may appear in more than one subgenre. To account for this,I used `separate_rows()` to split the genre column so that each film could be analyzed across its listed subgenres.This allows each subgenre to be analyzed individually, although it also means that observations are not completely independent. To keep the analysis clear and focused, I then restricted the dataset to the six most common subgenres.
+```{r}
+#| message: false
+#| warning: false
+top_genres <- horror_long %>%
+  count(genre_names, sort = TRUE) %>%
+  slice_head(n = 6)
+
+horror_plot <- horror_long %>%
+  filter(genre_names %in% top_genres$genre_names)
+
+
+```
+To measure financial success, I also created a profit variable by subtracting budget from revenue.
+```{r}
+#| message: false
+#| warning: false
+horror_plot_profit <- horror_plot %>%
+  filter(!is.na(budget),
+         !is.na(revenue)) %>%
+  mutate(
+    profit = revenue - budget,
+    profit_mil = profit / 1e6
+  )
+horror_clean <- horror_plot_profit %>%
+  filter(profit_mil > 1,
+         profit_mil < 300)
+count(horror_clean, genre_names, sort = TRUE)
+
+```
+Since all films in the dataset are classified as horror, the “Horror” category overlaps with other subgenres and should be interpreted as a general label rather than a distinct group.
+## 2 DATA Visualizations
+## FIGURE 1
+```{r}
+#| message: false
+#| warning: false
+horror_plot %>%
+  ggplot(aes(x = vote_average,
+             y = genre_names,
+             fill = genre_names)) +
+  geom_boxplot(show.legend = FALSE, color = "black") +
+  scale_fill_brewer(palette = "Dark2") +
+  labs(
+    title = "Ratings across horror-related subgenres",
+    x = "Average rating",
+    y = "Subgenre",
+    caption = "Subgenres based on listed movie genres"
+  ) +
+  theme_minimal()
+```
+Alt text figure 1: Boxplot showing the distribution of audience ratings across horror subgenres. Mystery has a slightly higher median rating, but there is substantial overlap across all subgenres.
+
+Mystery seems to have a slightly higher median rating compared to the other subgenres, but the difference is not very large. There is still a lot of overlap between the distributions, which suggests that no single subgenre clearly stands out in terms of ratings. While mystery-based horror may perform a bit better on average, overall audience ratings tend to be fairly consistent across different types of horror films.
+
+## FIGURE 2
+```{r}
+#| message: false
+#| warning: false
+horror_clean %>%
+  ggplot(aes(x = profit_mil,
+             y = genre_names,
+             fill = genre_names)) +
+  geom_boxplot(show.legend = FALSE, color = "black") +
+  scale_fill_brewer(palette = "Dark2") +
+  labs(
+    title = "Profit across horror subgenres",
+    x = "Profit (millions USD)",
+    y = "Subgenre",
+    caption = "Zero and extreme profit values removed"
+  ) +
+  theme_minimal()
+```
+
+Alt text Figure 2: The boxplot shows how profit varies across different horror subgenres. Mystery and Thriller tend to have slightly higher typical profits, while Comedy is generally lower. At the same time, there is a wide range of profits in every subgenre, which means some movies do very well while others do not, even within the same type of horror.
+
+Some subgenres, like Mystery and Thriller, show slightly higher median profits compared to others. However, there is a wide range of outcomes within each subgenre, with some films earning significantly more than others. This indicates that while certain types of horror films may perform better financially on average, profitability is still highly unpredictable and can vary greatly from one film to another
+
+
+The following table summarizes audience ratings, financial profit, runtime, and the number of movies across the most common horror subgenres.
+
+```{r}
+#| message: false
+#| warning: false
+horror_clean %>%
+  group_by(genre_names) %>%
+  summarize(
+    avg_rating = mean(vote_average, na.rm = TRUE),
+    avg_votes = mean(vote_count, na.rm = TRUE),
+    median_profit_mil = median(profit_mil, na.rm = TRUE),
+    movies = n()
+  ) %>%
+  gt() %>%
+  fmt_number(columns = c(avg_rating, median_profit_mil),
+             decimals = 2)
+```
+  The summary table shows that average ratings are very similar across all subgenres, mostly falling between about 6.0 and 6.3. This suggests that audiences tend to rate horror movies similarly, regardless of the subgenre. Financial performance, however, varies more. Subgenres like Mystery and Drama tend to have higher typical profits, while Comedy and Science Fiction are generally lower. Here I use `fmt_number()` to round selected columns to 2 decimal places, as I learned that it formats values to make tables easier to read.
+
+  However, these results should be interpreted with caution. Since many films belong to multiple genres, the same movie may be counted in more than one category, meaning the observations are not fully independent. Additionally, profit can be influenced by factors not captured in the dataset, such as marketing or release timing which may explain some of the variation observed across subgenres. Another limitation is the difference in the number of films across subgenres, as some categories contain significantly more movies than others, which may affect the reliability of the comparisons.
+  
+## Figure 3(Additional plots)
+```{r}
+#| message: false
+horror_clean %>%
+  ggplot(aes(x = vote_average,
+             y = profit_mil,
+             color = genre_names)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  scale_color_viridis_d() +
+  labs(
+    title = "Relationship between ratings and profit in horror films",
+    x = "Average rating",
+    y = "Profit (millions USD)",
+    color = "Subgenre"
+  ) +
+  theme_minimal()
+```
+Alt text Figure 3: Scatterplot showing the relationship between average rating and profit (in millions USD) across horror-related subgenres. There is a slight upward trend, indicating a weak positive relationship, but the points are widely scattered, showing that profit varies greatly at all rating levels.Here I use `scale_color_viridis_d()` because I wanted to try a different colorblind friendly palette and improve readability.This is because the viridis color palette is designed to be uniform, meaning differences in values are shown clearly and consistently.^[Source: https://cran.r-project.org/web/packages/viridis/vignettes/intro-to-viridis.html] 
+
+
+The graph suggests a weak positive relationship between ratings and profit, meaning that higher-rated films may earn slightly more on average. However, the relationship is not very strong, as there is considerable variation in profit at all rating levels. This indicates that factors beyond ratings play a significant role in determining financial success. While some subgenres, such as Thriller and Mystery, appear to show a slightly stronger upward trend, overall profitability cannot be explained by ratings alone.
+
+
+## Conclusion
+Overall, the horror subgenres have a very similar audience ratings but the financial success are a more different. Subgenres like Mystery and Thriller tend to earn slightly more. There is also only a weak positive link between ratings and profit, suggesting that higher ratings do not guarantee financial success. This shows that while audience response is fairly consistent, outcomes in the horror genre can vary widely as other factors such as release timing likely play a larger role in determining financial performance than ratings alone(releasing the movie during halloween).
+
